@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "M3TileActor.h"
+#include "PaperSprite.h"
 
 // Sets default values
 AM3TileActor::AM3TileActor()

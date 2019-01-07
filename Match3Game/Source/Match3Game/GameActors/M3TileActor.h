@@ -28,7 +28,7 @@ namespace EMatch3MoveType
 	{
 		MT_None,
 		MT_Failure,
-		MTStandard,
+		MT_Standard,
 		MT_MoreTiles,
 		MT_Combo
 	};

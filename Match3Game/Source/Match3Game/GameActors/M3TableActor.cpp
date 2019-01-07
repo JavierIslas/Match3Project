@@ -1,8 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
-
+/**TODO CHANGE CHECKS for IF's*/
+#include "M3TableActor.h"
+#include "M3TileActor.h"
+#include "PaperSpriteComponent.h"
 #include "Math/UnrealMath.h"
 #include "../GameFramework/M3GameMode.h"
-#include "M3TableActor.h"
 
 // Sets default values
 AM3TableActor::AM3TableActor(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -23,7 +25,9 @@ AM3TileActor * AM3TableActor::CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, 
 		checkSlow(TileLibrary.IsValidIndex(TileTypeID));
 
 		UWorld* const World = GetWorld();
-		if (World)
+		if (!World) { return nullptr; }
+
+		else
 		{
 			//Set Spawn parameters
 			FActorSpawnParameters SpawnParam;
@@ -35,7 +39,7 @@ AM3TileActor * AM3TableActor::CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, 
 
 			//Spawn the tile
 			AM3TileActor* const NewTile = World->SpawnActor<AM3TileActor>(TileToSpawn, SpawnLocation, SpawnRotation, SpawnParam);
-			NewTile->GetRenderComponent()->SetMovility(EComponentMobility::Movable);
+			NewTile->GetRenderComponent()->SetMobility(EComponentMobility::Movable);
 			NewTile->TileTypeID = TileTypeID;
 			NewTile->Abilities = TileLibrary[TileTypeID].Abilities;
 			NewTile->SetTileMaterial(TileMaterial);
@@ -133,6 +137,14 @@ void AM3TableActor::InitializeTable()
 
 void AM3TableActor::ReturnMatchSounds(TArray<USoundWave*>& MatchSounds)
 {
+	MatchSounds.Reset();
+	if (TilesBeingDestroyed.Num() > 0)
+	{
+		for (AM3TileActor* Tile : TilesBeingDestroyed)
+		{
+			MatchSounds.AddUnique(Tile->GetMatchSound());
+		}
+	}
 }
 
 FVector AM3TableActor::GetLocationFromTableAddress(int32 TableAddress) const
@@ -149,29 +161,131 @@ FVector AM3TableActor::GetLocationFromTableAddress(int32 TableAddress) const
 
 FVector AM3TableActor::GetLocationFromTableAddressWithOffset(int32 TableAddress, int32 XOffserInTiles, int32 YOffsetInTiles) const
 {
-	return FVector();
+	FVector OutLocation = GetLocationFromTableAddress(TableAddress);
+	OutLocation.X += TileSize.X * (float)(XOffserInTiles);
+	OutLocation.Y += TileSize.Y * (float)(YOffsetInTiles);
+	return OutLocation;
 }
 
 bool AM3TableActor::GetTableAddressWithOffset(int32 InitialTableAddres, int32 XOffset, int32 YOffset, int32 & ReturnTableAddress) const
 {
-	return false;
+	int32 NewAxisValue;
+
+	ReturnTableAddress = -1; //Invalid value
+
+	//check for within X range
+	check(TableWidth > 0); 
+	NewAxisValue = (InitialTableAddres % TableWidth) + XOffset;
+	if (NewAxisValue != FMath::Clamp(NewAxisValue, 0, (TableWidth - 1)))
+	{
+		return false;
+	}
+
+	//check for within Y range
+	NewAxisValue = (InitialTableAddres % TableWidth) + YOffset;
+	if (NewAxisValue != FMath::Clamp(NewAxisValue, 0, (TableHeight - 1)))
+	{
+		return false;
+	}
+
+	ReturnTableAddress = (InitialTableAddres + XOffset + (YOffset * TableWidth));
+	check(ReturnTableAddress >= 0);
+	check(ReturnTableAddress < (TableWidth * TableHeight));
+
+	return true;
 }
 
 bool AM3TableActor::AreAddressesNeighbors(int32 TableAddressA, int32 TableAddressB) const
 {
+	if ((FMath::Min(TableAddressA, TableAddressB) >= 0) && (FMath::Max(TableAddressA, TableAddressB) < (TableWidth * TableHeight)))
+	{
+		int32 TableAddressOffset = FMath::Abs(TableAddressA - TableAddressB);
+		return ((TableAddressOffset == 1) || (TableAddressOffset == TableWidth));
+	}
 	return false;
 }
 
 void AM3TableActor::OnTileFinishedFalling(AM3TileActor * Tile, int32 LandingAddress)
 {
+	int32 ReturnTableAddress;
+
+	//Remove Tile from its original position if it's still there (hasn't been replaced by another falling tile)
+	if (GetTableAddressWithOffset(Tile->GetTableAddress(), 0, 0, ReturnTableAddress))
+	{
+		if (GameTiles[ReturnTableAddress] == Tile)
+		{
+			GameTiles[ReturnTableAddress] = nullptr;
+		}
+	}
+
+	//Validate new table address and replace whatever is there
+	if (GetTableAddressWithOffset(LandingAddress, 0, 0, ReturnTableAddress))
+	{
+		GameTiles[ReturnTableAddress] = Tile;
+		Tile->SetTableAddress(ReturnTableAddress);
+		Tile->TileState = ETileState::ETS_Normal;
+	}
+
+	//Tile no longer falling
+	FallingTiles.RemoveSingleSwap(Tile);
+	TilesToCheck.Add(Tile);
+	if (FallingTiles.Num() == 0)
+	{
+		RespawnTiles();
+	}
 }
 
 void AM3TableActor::OnTileFinishedMatching(AM3TileActor * InTile)
 {
+	if (InTile)
+	{
+		TilesBeingDestroyed.RemoveSwap(InTile);
+		InTile->Destroy();
+	}
+
+	if (TilesBeingDestroyed.Num() == 0)
+	{
+		//Make all the tiles fall if they are above empty space
+		for (AM3TileActor* Tile : FallingTiles)
+		{
+			Tile->StartFalling();
+		}
+		if (FallingTiles.Num() == 0)
+		{
+			RespawnTiles();
+		}
+	}
 }
 
 void AM3TableActor::OnSpawnDisplayFinished(AM3TileActor * InTile)
 {
+	SwappingTiles.Add(InTile);
+	if (SwappingTiles.Num() == 2)
+	{
+		check(SwappingTiles[0] && SwappingTiles[1]);
+		bPendingSwapMove = false;
+		if (bPendingSwapMoveSuccess)
+		{
+			SwapTiles(SwappingTiles[0], SwappingTiles[1], true);
+			SwappingTiles.Reset();
+			if (LastLegalMatch.Num() > MinimumRunLength)
+			{
+				SetLastMove(EMatch3MoveType::MT_MoreTiles);
+
+			}
+			else
+			{
+				SetLastMove(EMatch3MoveType::MT_Standard);
+			}
+			//Execute the (verified legal) move
+			ExecuteMatch(LastLegalMatch);
+		}
+		else
+		{
+			SwappingTiles.Empty();
+			OnMoveMade(EMatch3MoveType::MT_Failure);
+		}
+	}
 }
 
 void AM3TableActor::RespawnTiles()

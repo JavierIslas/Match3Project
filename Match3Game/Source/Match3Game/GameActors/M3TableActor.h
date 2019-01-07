@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "PaperSprite.h"
 #include "M3TileActor.h"
 #include "M3TableActor.generated.h"
 
