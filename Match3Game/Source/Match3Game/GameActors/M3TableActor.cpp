@@ -5,6 +5,7 @@
 #include "PaperSpriteComponent.h"
 #include "Math/UnrealMath.h"
 #include "../GameFramework/M3GameMode.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AM3TableActor::AM3TableActor(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -290,20 +291,127 @@ void AM3TableActor::OnSpawnDisplayFinished(AM3TileActor * InTile)
 
 void AM3TableActor::RespawnTiles()
 {
+	for (int32 x = 0; x < TableWidth; ++x)
+	{
+		//Replace all null tiles, starting from the top of the column
+		//Stop when hit a non-null tile
+		int32 BaseAddress, TestAddress;
+		if (GetTableAddressWithOffset(0, x, TableHeight - 1, BaseAddress))
+		{
+			int32 YDepth;
+			for (YDepth = 0; GetTableAddressWithOffset(BaseAddress, 0, -YDepth, TestAddress) && (!GetTileFromTableAddress(TestAddress)); ++YDepth)
+			{
+				//This loop finds the lowest Y value, but does nothing TODO SOMETHING
+			}
+			for (int32 Y = YDepth; Y >= 0 ; --Y)
+			{
+				int32 NewTileTypeID = SelectTileFromLibrary();
+				GetTableAddressWithOffset(BaseAddress, 0, -Y, TestAddress);
+				//Move our rile up visually so it has room to fall, but don't change its grid address. The new grid address would be off-table and invalid anyway
+				if (AM3TileActor* NewTile = CreateTile(TileLibrary[NewTileTypeID].TileClass, TileLibrary[NewTileTypeID].TileMaterial, GetLocationFromTableAddressWithOffset(TestAddress, 0, (YDepth + 1)), TestAddress, NewTileTypeID))
+				{
+					TilesToCheck.Add(NewTile);
+					NewTile->TileState = ETileState::ETS_Falling;
+					check(!FallingTiles.Contains(NewTile));
+					FallingTiles.Add(NewTile);
+				}
+			}
+		}
+		else
+		{
+			check(false);
+		}
+	}
+	if (FallingTiles.Num() > 0)
+	{
+		//Any falling tile that exist at this point are new ones, and are falling from physical location (off table) to their correct location
+		for (AM3TileActor* Tile : FallingTiles)
+		{
+			Tile->StartFalling(true);
+		}
+		return;
+	}
+
+	//Check for automatic matches 
+	TArray<AM3TileActor*> AllMatchingTiles;
+	for (AM3TileActor* Tile : TilesToCheck)
+	{
+		TArray<AM3TileActor*> MatchingTiles = FindNeighbors(Tile);
+		for (AM3TileActor* MatchingTile : MatchingTiles)
+		{
+			AllMatchingTiles.AddUnique(MatchingTile);
+		}
+	}
+
+	if (AllMatchingTiles.Num() > 0)
+	{
+		SetLastMove(EMatch3MoveType::MT_Combo);
+		ExecuteMatch(AllMatchingTiles);
+	}
+	else
+	{
+		if (IsUnWinnable())
+		{
+			if (AM3GameMode* GM = Cast<AM3GameMode>(UGameplayStatics::GetGameMode(this)))
+			{
+				GM->GameOver();
+				return;
+			}
+		}
+		//UM3BlueprintFunctionLibrary::PauseGameTimer(this, false);
+	}
 }
 
 void AM3TableActor::SwapTiles(AM3TileActor * A, AM3TileActor * B, bool bRepositionTileActors)
 {
+	//Swap Table positions for A and B
+	int32 TableAddress = A->GetTableAddress();
+	A->SetTableAddress(B->GetTableAddress());
+	B->SetTableAddress(A->GetTableAddress());
+
+	//Spawn array positions for A and B
+	GameTiles[A->GetTableAddress()] = A;
+	GameTiles[B->GetTableAddress()] = B;
+
+	if (bRepositionTileActors)
+	{
+		//Move tiles to their new positions
+		A->SetActorLocation(GetLocationFromTableAddress(A->GetTableAddress()));
+		B->SetActorLocation(GetLocationFromTableAddress(B->GetTableAddress()));
+	}
+
 }
 
 bool AM3TableActor::IsMoveLegal(AM3TileActor * A, AM3TileActor * B)
 {
+	if (A && B && (A->TileTypeID != B->TileTypeID) && AreAddressesNeighbors(A->GetTableAddress(), B->GetTableAddress()))
+	{
+		if ((A->TileTypeID != B->TileTypeID) && AreAddressesNeighbors(A->GetTableAddress(), B->GetTableAddress()))
+		{
+			SwapTiles(A, B);
+
+			//Check for matches with A and B in their proposed positions
+			LastLegalMatch = FindNeighbors(A);
+			LastLegalMatch.Append(FindNeighbors(B));
+
+			SwapTiles(A, B);
+
+			return (LastLegalMatch.Num() > 0);
+		}
+	}
 	return false;
 }
 
 TArray<AM3TileActor*> AM3TableActor::GetExplosionList(AM3TileActor * A) const
 {
-	return TArray<AM3TileActor*>();
+	check(A);
+	check(A->Abilities.CanExplode());
+	int32 AdjustedBombPower = A->Abilities.BombPower;
+	if (AM3GameMode* GM = Cast<AM3GameMode>(UGameplayStatics::GetGameMode(A)))
+	{
+		AdjustedBombPower = FMath::Max(1, AdjustedBombPower + 1 + GM->CalculateBombPower());
+	}
+	return FindNeighbors(A, false, AdjustedBombPower);
 }
 
 TArray<AM3TileActor*> AM3TableActor::FindNeighbors(AM3TileActor * StartingTile, bool bMustMatchID, int32 RungLength) const
