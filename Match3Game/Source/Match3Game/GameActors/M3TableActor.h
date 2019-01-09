@@ -99,7 +99,7 @@ public:
 
 	void OnTileFinishedMatching(AM3TileActor* InTile);
 
-	void OnSpawnDisplayFinished(AM3TileActor* InTile);
+	void OnSwapDisplayFinished(AM3TileActor* InTile);
 
 	void RespawnTiles();
 
@@ -156,7 +156,7 @@ private:
 	TArray<AM3TileActor*> TilesBeingDestroyed;
 
 	/** The type of move last executed by a given player */
-	TMap <class AM3PlayerController*, EMatch3MoveType::Type> LastMove;
+	TMap <class APlayerController*, EMatch3MoveType::Type> LastMove;
 
 	/** Indicates that we are waiting to complete a swap move. When SwappingTiles is populated by 2 tiles, we are done */
 	uint32 bPendingSwapMove : 1;

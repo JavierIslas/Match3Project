@@ -30,7 +30,10 @@ namespace EMatch3MoveType
 		MT_Failure,
 		MT_Standard,
 		MT_MoreTiles,
-		MT_Combo
+		MT_Combo,
+		MT_Bomb,
+		MT_AllBombs,
+		MT_MAX
 	};
 }
 
@@ -78,7 +81,7 @@ public:
 
 	/**Mouse for testing on PC */
 	UFUNCTION()
-	void TilePress_Mouse(AActor* CleckedActor, FKey ButtonClicked);
+	void TilePress_Mouse(AActor* ClickedActor, FKey ButtonClicked);
 
 	UFUNCTION()
 	void TileEnter_Mouse(AActor* MousedOverActor);
