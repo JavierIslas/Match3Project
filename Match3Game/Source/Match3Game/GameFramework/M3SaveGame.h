@@ -17,7 +17,7 @@ struct FMatch3LevelSaveData
 
 	/** Score to beat to get silver */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Silvercore;
+	int32 SilverScore;
 
 	/** Score to beat to get bronze */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

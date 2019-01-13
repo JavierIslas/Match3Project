@@ -128,7 +128,7 @@ protected:
 
 	FTimerHandle TimeHandle_GameOverTimer;
 
-	bool GameWillBeWon;
+	bool bGameWillBeWon;
 
 };
 

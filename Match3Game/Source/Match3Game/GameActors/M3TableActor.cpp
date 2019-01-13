@@ -19,7 +19,7 @@ AM3TableActor::AM3TableActor(const FObjectInitializer& ObjectInitializer) : Supe
 
 }
 
-AM3TileActor * AM3TableActor::CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, UMaterialInstanceConstant * TileMaterial, FVector SpawnLocation, int32 SpawnTableAddress, int32 TileTypeID)
+AM3TileActor * AM3TableActor::CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, UMaterialInterface * TileMaterial, FVector SpawnLocation, int32 SpawnTableAddress, int32 TileTypeID)
 {
 	if (!TileToSpawn) { return nullptr; }
 	else

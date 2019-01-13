@@ -97,8 +97,8 @@ public:
 	void StopFallingEffect();
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Special Game Event")
-	void SetTileMaterial(class UMaterialInstanceConstant* TileMaterial);
-	virtual void SetTileMaterial_Implementation(class UMaterialInstanceConstant* TileMaterial);
+	void SetTileMaterial(class UMaterialInterface* TileMaterial);
+	virtual void SetTileMaterial_Implementation(class UMaterialInterface* TileMaterial);
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Special Game Event")
 	void OnMatched(EMatch3MoveType::Type MoveType);

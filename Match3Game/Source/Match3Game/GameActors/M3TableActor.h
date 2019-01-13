@@ -19,7 +19,7 @@ struct FTileType
 	float Probability = 1.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	UMaterialInstanceConstant* TileMaterial = nullptr;
+	UMaterialInterface* TileMaterial = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TSubclassOf<AM3TileActor> TileClass;
@@ -63,7 +63,7 @@ public:
 	int32 TableHeight;
 
 	/** Spawn a tile and associate it with a specific Table address */
-	AM3TileActor* CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, UMaterialInstanceConstant* TileMaterial, FVector SpawnLocation, int32 SpawnTableAddress, int32 TileTypeID);
+	AM3TileActor* CreateTile(TSubclassOf<AM3TileActor> TileToSpawn, UMaterialInterface* TileMaterial, FVector SpawnLocation, int32 SpawnTableAddress, int32 TileTypeID);
 
 	/** Randomly select a type of tile from the Table's Library, using the probability values on the tile. */
 	int32 SelectTileFromLibrary();
